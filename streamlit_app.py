@@ -6,7 +6,6 @@ st.write(
 )
 
 import numpy as np
-import matplotlib.pyplot as plt
 import streamlit as st
 
 st.set_page_config(page_title="Vermischung Mantel Krusten Reservoir", page_icon="🪨", layout="wide")
@@ -60,7 +59,7 @@ def find_closest_plutonic_rock(mixed_sio2, mixed_mgo):
     return best_name, best_distance
 
 
-def create_line_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
+def create_line_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
     f_values = np.linspace(0, 1, 120)
     sio2_curve = []
     mgo_curve = []
@@ -70,43 +69,22 @@ def create_line_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
         mgo_curve.append(mgo)
 
     mixed_sio2, mixed_mgo = calculate_mixing(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(f_values * 100, sio2_curve, color=MIX_COLOR, linewidth=2, label="SiO2")
-    ax.plot(f_values * 100, mgo_curve, color=CRUST_COLOR, linewidth=2, linestyle="--", label="MgO")
-    ax.scatter([f_crust * 100], [mixed_sio2], s=60, color=MIX_COLOR, label="Aktueller SiO2-Wert", zorder=5)
-    ax.scatter([f_crust * 100], [mixed_mgo], s=60, color=CRUST_COLOR, label="Aktueller MgO-Wert", zorder=5)
-    ax.set_title("Mischungskurven: SiO2 und MgO gegen Krustenanteil")
-    ax.set_xlabel("Krustenanteil (%)")
-    ax.set_ylabel("Konzentration (Gew. %)")
-    ax.legend()
-    fig.tight_layout()
-    return fig
+    return {"Krustenanteil (%)": (f_values * 100).tolist(), "SiO2": sio2_curve, "MgO": mgo_curve, "mixed": {"SiO2": mixed_sio2, "MgO": mixed_mgo}}
 
 
-def create_bar_plot(crust_sio2, crust_mgo, mantle_sio2, mantle_mgo, mixed_sio2, mixed_mgo):
+def create_bar_data(crust_sio2, crust_mgo, mantle_sio2, mantle_mgo, mixed_sio2, mixed_mgo):
     categories = ["SiO2", "MgO"]
     crust_vals = [crust_sio2, crust_mgo]
     mantle_vals = [mantle_sio2, mantle_mgo]
     mix_vals = [mixed_sio2, mixed_mgo]
-
-    x = np.arange(len(categories))
-    width = 0.25
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar(x - width, crust_vals, width, label="Kruste", color=CRUST_COLOR)
-    ax.bar(x, mantle_vals, width, label="Mantel", color=MANTLE_COLOR)
-    ax.bar(x + width, mix_vals, width, label="Mischung", color=MIX_COLOR)
-    ax.set_xticks(x)
-    ax.set_xticklabels(categories)
-    ax.set_title("Vergleich der Reservoir-Zusammensetzungen")
-    ax.set_xlabel("Komponente")
-    ax.set_ylabel("Konzentration (Gew. %)")
-    ax.legend()
-    fig.tight_layout()
-    return fig
+    # Return as table-like structure
+    rows = []
+    for cat, c, m, x in zip(categories, crust_vals, mantle_vals, mix_vals):
+        rows.append({"Komponente": cat, "Kruste": c, "Mantel": m, "Mischung": x})
+    return rows
 
 
-def create_ratio_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
+def create_ratio_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
     f_values = np.linspace(0, 1, 120)
     sio2_line = []
     mgo_line = []
@@ -119,31 +97,12 @@ def create_ratio_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
 
     mixed_sio2, mixed_mgo = calculate_mixing(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
     mixed_ratio = mixed_mgo / mixed_sio2 if mixed_sio2 else float("nan")
-    
     closest_plutonic_rock, _ = find_closest_plutonic_rock(mixed_sio2, mixed_mgo)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(mg_si_line, mgo_line, color="gray", linestyle=":", label="Mischungslinie")
-    ax.scatter([mixed_ratio], [mixed_mgo], s=500, color=(30/255,144/255,255/255,0.15), zorder=2)
-    ax.scatter([mixed_ratio], [mixed_mgo], s=80, color=MIX_COLOR, edgecolors="white", linewidths=1.5, zorder=3, label="Aktuelle Mischung")
-    ax.scatter([mantle_mgo / mantle_sio2 if mantle_sio2 else float("nan")], [mantle_mgo], s=60, color=MANTLE_COLOR, label="Mantel")
-    ax.scatter([crust_mgo / crust_sio2 if crust_sio2 else float("nan")], [crust_mgo], s=60, color=CRUST_COLOR, label="Kruste")
-
-    for rock_name, comp in PLUTONIC_REFERENCE_ROCKS.items():
-        is_closest = rock_name == closest_plutonic_rock and rock_name != "Peridotit"
-        size = 120 if is_closest else 60
-        edge = "yellow" if is_closest else "black"
-        ax.scatter([comp["MgO"] / comp["SiO2"] if comp["SiO2"] else float("nan")], [comp["MgO"]], s=size, color=comp["color"], edgecolors=edge, linewidths=1.2, zorder=4)
-
-    ax.set_title("MgO gegen Mg/Si-Verhältnis")
-    ax.set_xlabel("Mg/Si-Verhältnis")
-    ax.set_ylabel("MgO (Gew. %)")
-    ax.legend()
-    fig.tight_layout()
-    return fig
+    # Return series and current point info
+    return {"Mg/Si_series": mg_si_line, "MgO_series": mgo_line, "current": {"mixed_ratio": mixed_ratio, "mixed_mgo": mixed_mgo, "closest_plutonic": closest_plutonic_rock}}
 
 
-def create_mg_si_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
+def create_mg_si_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
     f_values = np.linspace(0, 1, 120)
     si_values = []
     mg_values = []
@@ -153,28 +112,10 @@ def create_mg_si_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo):
         mg_values.append(mgo)
 
     mixed_sio2, mixed_mgo = calculate_mixing(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
-    
     closest_plutonic_rock, _ = find_closest_plutonic_rock(mixed_sio2, mixed_mgo)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(si_values, mg_values, color="gray", linestyle=":", label="Mischungslinie")
-    ax.scatter([mantle_sio2], [mantle_mgo], s=80, color=MANTLE_COLOR, label="Mantel")
-    ax.scatter([crust_sio2], [crust_mgo], s=80, color=CRUST_COLOR, label="Kruste")
-    ax.scatter([mixed_sio2], [mixed_mgo], s=500, color=(30/255,144/255,255/255,0.15), zorder=2)
-    ax.scatter([mixed_sio2], [mixed_mgo], s=100, color=MIX_COLOR, edgecolors="white", linewidths=1.5, zorder=3, label="Aktuelle Mischung")
-
-    for rock_name, comp in PLUTONIC_REFERENCE_ROCKS.items():
-        is_closest = rock_name == closest_plutonic_rock and rock_name != "Peridotit"
-        size = 120 if is_closest else 60
-        edge = "yellow" if is_closest else "black"
-        ax.scatter([comp["SiO2"]], [comp["MgO"]], s=size, color=comp["color"], edgecolors=edge, linewidths=1.2, zorder=4)
-
-    ax.set_title("Mg gegen Si")
-    ax.set_xlabel("Si (Gew. %)")
-    ax.set_ylabel("Mg (Gew. %)")
-    ax.legend()
-    fig.tight_layout()
-    return fig
+    # Return series and reference points
+    ref_points = {name: {"SiO2": comp["SiO2"], "MgO": comp["MgO"], "color": comp["color"]} for name, comp in PLUTONIC_REFERENCE_ROCKS.items()}
+    return {"Si_series": si_values, "Mg_series": mg_values, "current": {"SiO2": mixed_sio2, "MgO": mixed_mgo, "closest_plutonic": closest_plutonic_rock}, "refs": ref_points}
 
 
 st.title("Vermischung Mantel Krusten Reservoir")
@@ -202,17 +143,29 @@ st.caption(f"Die aktuelle Mischung ähnelt am ehesten {closest_rock} (Abstand: {
 st.info(f"Bei diesen Mischwerten entsteht im Reservoir am ehesten {closest_plutonic_rock} (Abstand zu den Referenzpunkten: {plutonic_distance:.2f}).")
 
 st.subheader("1. Mischungskurven")
-st.pyplot(create_line_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo))
+line_data = create_line_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
+st.line_chart({"SiO2": line_data["SiO2"], "MgO": line_data["MgO"]})
 st.write("**Geologische Bedeutung:** Die Mischungskurven zeigen, wie sich die Elementkonzentrationen linear zwischen reinem Mantel (0%) und reiner Kruste (100%) ändern. Dies ist das Grundprinzip der Magmenmischung: Wenn krustenähnliches und mantelähnliches Material vermischt werden, entsteht eine neue Zusammensetzung auf der geraden Linie zwischen den Endgliedern.")
 
 st.subheader("2. Vergleich der Reservoir-Zusammensetzungen")
-st.pyplot(create_bar_plot(crust_sio2, crust_mgo, mantle_sio2, mantle_mgo, mixed_sio2, mixed_mgo))
+bar_rows = create_bar_data(crust_sio2, crust_mgo, mantle_sio2, mantle_mgo, mixed_sio2, mixed_mgo)
+st.table(bar_rows)
 st.write("**Geologische Bedeutung:** Der Vergleich zeigt deutlich die chemischen Unterschiede zwischen Kruste und Mantel. Die Kruste ist SiO₂-reich (felsisch, leicht) und MgO-arm, während der Mantel umgekehrt zusammengesetzt ist (mafisch, schwer). Bei einer Mischung erzeugt der unterschiedliche Gehalt an diesen Oxiden ein neues Material mit Zwischeneigenschaften.")
 
 st.subheader("3. MgO gegen Mg/Si-Verhältnis")
-st.pyplot(create_ratio_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo))
+ratio = create_ratio_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
+st.line_chart({"Mg/Si": ratio["Mg/Si_series"], "MgO": ratio["MgO_series"]})
+st.markdown(f"**Aktuelle Mischung:** Mg/Si = {ratio['current']['mixed_ratio']:.3f}, MgO = {ratio['current']['mixed_mgo']:.2f}")
 st.write("**Geologische Bedeutung:** Das Mg/Si-Verhältnis ist ein wichtiger geochemischer Index: Höhere Werte deuten auf mafische (magnesiumreiche) Magmen hin, die aus dem Mantel stammen, während niedrige Werte felsische (kieselsäurereichere) Magmen anzeigen. Die Mischungslinie zeigt, wie dieser Index bei der Vermischung von Kruste und Mantel variiert.")
 
 st.subheader("4. Mg gegen Si")
-st.pyplot(create_mg_si_plot(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo))
+mg_si = create_mg_si_data(f_crust, crust_sio2, crust_mgo, mantle_sio2, mantle_mgo)
+# Zeige die Mischungslinie als Tabelle und die aktuellen/Referenzpunkte
+points = []
+points.append({"Name": "Mantel", "SiO2": mantle_sio2, "MgO": mantle_mgo})
+points.append({"Name": "Kruste", "SiO2": crust_sio2, "MgO": crust_mgo})
+points.append({"Name": "Aktuelle Mischung", "SiO2": mg_si["current"]["SiO2"], "MgO": mg_si["current"]["MgO"]})
+for name, comp in mg_si["refs"].items():
+    points.append({"Name": name, "SiO2": comp["SiO2"], "MgO": comp["MgO"]})
+st.table(points)
 st.write("**Geologische Bedeutung:** Dies ist das klassische geochemische Diagramm für Magmenherkunft. Die Position eines Magmas zwischen den Endgliedern (Kruste und Mantel) zeigt seinen Ursprung oder seine Mischungsgeschichte. Je näher die Mischung zum Mantel-Punkt, desto magnesiumreicher und primitiver ist das Magma; je näher zur Kruste, desto differenzierter und felsischer ist es.")
